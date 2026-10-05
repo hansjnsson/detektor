@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="Detektor">
+<meta name="application-name" content="Detektor">
+<title>Detektor</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#000;
+  --text:#fff;
+  --muted:#8e8e93;
+  --ridge:#5c5c5f;
+  --laser:#ff2d20;
+  --res:#fff;
+  --sheet:#1c1c1e;
+  --cell:#2c2c2e;
+  --sep:#3a3a3c;
+  --accent:#ff453a;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;background:#000}
+body{
+  height:100%;margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,"SF Pro Display","SF Pro Text",system-ui,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  display:flex;align-items:center;justify-content:center;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;overflow:hidden;
+}
+.phone{
+  position:relative;width:100%;max-width:440px;height:100%;max-height:932px;
+  container-type:inline-size;display:flex;flex-direction:column;overflow:hidden;
+}
+.topbar{padding:3cqw 0 0;display:flex;justify-content:center}
+.title{
+  padding:3cqw 8cqw;font-size:3.9cqw;font-weight:600;letter-spacing:.42em;margin-right:-.42em;
+  color:var(--muted);text-transform:uppercase;touch-action:none;
+}
+.stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.scanner{position:relative;width:62cqw;aspect-ratio:200/240;touch-action:none}
+.fp{position:absolute;inset:0;width:100%;height:100%;display:block;fill:none;stroke-width:4.4;stroke-linecap:round}
+.fp.base{stroke:var(--ridge);transition:stroke .5s ease-out}
+.fp.hot{stroke:var(--laser);opacity:0;filter:drop-shadow(0 0 1.2cqw var(--laser))}
+.laser{
+  position:absolute;left:-7%;right:-7%;top:0;height:.75cqw;margin-top:-.375cqw;border-radius:1cqw;
+  background:#ff6a5e;opacity:0;pointer-events:none;
+  box-shadow:0 0 1.6cqw .5cqw var(--laser),0 0 7cqw 1.6cqw rgba(255,45,32,.55);
+}
+.phone[data-state="scanning"] .laser,.phone[data-state="scanning"] .fp.hot{opacity:1}
+.phone[data-state="result"] .fp.base{stroke:var(--res);filter:drop-shadow(0 0 1.6cqw var(--res))}
+.readout{
+  min-height:26cqw;padding:0 6cqw;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:4.4cqw;line-height:1.25;color:var(--muted);font-variant-numeric:tabular-nums;
+}
+.phone[data-state="result"] .readout{
+  font-size:10.5cqw;font-weight:700;letter-spacing:.03em;line-height:1.1;color:var(--res);
+  overflow-wrap:anywhere;animation:pop .45s cubic-bezier(.2,.9,.3,1.25);
+}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}
+.controls{padding:0 6cqw 9cqw}
+.scan{
+  position:relative;overflow:hidden;display:block;width:100%;height:16cqw;border:0;border-radius:8cqw;margin:0;padding:0;
+  cursor:pointer;font:inherit;font-size:5.6cqw;font-weight:600;letter-spacing:.06em;color:#fff;
+  background-color:#2a2a2b;
+  background-image:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,0) 55%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);touch-action:none;
+  -webkit-appearance:none;appearance:none;outline:none;transition:opacity .25s;
+}
+.scan::after{
+  content:"";position:absolute;inset:0;background:#fff;opacity:0;
+  transition:opacity .45s ease-out;pointer-events:none;
+}
+.scan:active::after{opacity:.2;transition:none}
+.scan:focus-visible{box-shadow:0 0 0 2px #fff}
+.phone[data-state="scanning"] .scan{opacity:.4}
+/* Dolda inställningar */
+#hapticLabel{position:absolute;left:-9999px;width:0;height:0;opacity:0;pointer-events:none}
+.sheet{
+  position:absolute;inset:0;background:var(--sheet);z-index:10;display:none;flex-direction:column;
+  -webkit-user-select:text;user-select:text;overflow-y:auto;font-size:17px;padding-bottom:24px;
+}
+.sheet.open{display:flex}
+.sheet header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 6px}
+.sheet h1{font-size:28px;font-weight:700;margin:0;letter-spacing:.01em}
+.done{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;font-size:17px;padding:8px 0;cursor:pointer}
+.group{background:var(--cell);border-radius:12px;margin:14px 16px 0;flex:none}
+.caption{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.03em;margin:22px 32px -7px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;min-height:46px}
+.row + .row{border-top:.5px solid var(--sep)}
+.row label{flex:1}
+.row input[type=text],.row input[type=number],.row select{
+  background:none;border:0;color:var(--text);font:inherit;text-align:right;width:60%;outline:none;
+  -webkit-user-select:text;user-select:text;
+}
+.row select{width:auto;-webkit-appearance:none;appearance:none;color:var(--muted);cursor:pointer;text-align-last:right}
+.row select option{background:var(--cell);color:var(--text)}
+.row input::placeholder{color:#636366}
+.note{color:var(--muted);font-size:13px;line-height:1.35;margin:7px 32px 0}
+.status{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.scan::after,.scan,.fp.base{transition:none}.phone[data-state="result"] .readout{animation:none}}
+</style>
+</head>
+<body>
+<div class="phone" id="phone" data-state="idle">
+  <div class="topbar">
+    <div class="title" id="title">Detektor</div>
+  </div>
+
+  <div class="stage">
+    <div class="scanner" id="scanner">
+      <svg class="fp base" id="fpBase" viewBox="0 0 200 240" aria-hidden="true"></svg>
+      <svg class="fp hot" id="fpHot" viewBox="0 0 200 240" aria-hidden="true"></svg>
+      <div class="laser" id="laser"></div>
+    </div>
+  </div>
+
+  <div class="readout" id="readout" aria-live="polite"></div>
+
+  <div class="controls">
+    <button class="scan" id="scan">Skanna</button>
+  </div>
+
+  <label id="hapticLabel" aria-hidden="true"><input id="hapticSwitch" type="checkbox" switch></label>
+
+  <div class="sheet" id="sheet" role="dialog" aria-label="Dolt läge">
+    <header>
+      <h1>Dolt läge</h1>
+      <button class="done" id="done">Klar</button>
+    </header>
+
+    <p class="caption">Vänster del av knappen</p>
+    <div class="group">
+      <div class="row">
+        <label for="s-left-text">Svar</label>
+        <input type="text" id="s-left-text" autocomplete="off" maxlength="60">
+      </div>
+      <div class="row">
+        <label for="s-left-color">Färg</label>
+        <select id="s-left-color"></select>
+      </div>
+    </div>
+
+    <p class="caption">Mitten av knappen</p>
+    <div class="group">
+      <div class="row">
+        <label for="s-mid-text">Svar</label>
+        <input type="text" id="s-mid-text" autocomplete="off" maxlength="60">
+      </div>
+      <div class="row">
+        <label for="s-mid-color">Färg</label>
+        <select id="s-mid-color"></select>
+      </div>
+    </div>
+
+    <p class="caption">Höger del av knappen</p>
+    <div class="group">
+      <div class="row">
+        <label for="s-right-text">Svar</label>
+        <input type="text" id="s-right-text" autocomplete="off" maxlength="60">
+      </div>
+      <div class="row">
+        <label for="s-right-color">Färg</label>
+        <select id="s-right-color"></select>
+      </div>
+    </div>
+    <p class="note">Knappen ser ut som en enda knapp men är delad i tre lika breda delar. Var du trycker avgör vilket svar som visas när skanningen är klar.</p>
+
+    <div class="group">
+      <div class="row">
+        <label for="s-seconds">Skanningstid (sekunder)</label>
+        <input type="number" id="s-seconds" inputmode="numeric" min="1" max="15" step="1">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="row">
+        <label>Version</label>
+        <span class="status" id="s-version"></span>
+      </div>
+    </div>
+    <p class="note">Öppna den här sidan genom att hålla kvar fingret på rubriken högst upp.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var phone = $('phone'), elReadout = $('readout'), elLaser = $('laser'), elHot = $('fpHot'), btn = $('scan');
+
+  /* ---------- inställningar ---------- */
+  var APP_VERSION = '1 · 2026-10-05';
+  var ZONES = ['left','mid','right'];
+  var COLORS = [
+    { id:'green',  name:'Grön',  hex:'#30d158' },
+    { id:'yellow', name:'Gul',   hex:'#ffd60a' },
+    { id:'red',    name:'Röd',   hex:'#ff453a' },
+    { id:'blue',   name:'Blå',   hex:'#0a84ff' },
+    { id:'white',  name:'Vit',   hex:'#ffffff' }
+  ];
+  var cfg = {
+    left:  { text:'SANNING', color:'green' },
+    mid:   { text:'OSÄKERT', color:'yellow' },
+    right: { text:'LÖGN',    color:'red' },
+    seconds:3
+  };
+  try {
+    var saved = JSON.parse(localStorage.getItem('detektor_cfg') || 'null');
+    if (saved && typeof saved === 'object'){
+      ZONES.forEach(function(z){
+        if (saved[z] && typeof saved[z] === 'object'){
+          if (typeof saved[z].text === 'string') cfg[z].text = saved[z].text;
+          if (typeof saved[z].color === 'string') cfg[z].color = saved[z].color;
+        }
+      });
+      if (isFinite(saved.seconds)) cfg.seconds = saved.seconds;
+    }
+  } catch(e){}
+  function saveCfg(){ try { localStorage.setItem('detektor_cfg', JSON.stringify(cfg)); } catch(e){} }
+  function hexOf(id){
+    for (var i = 0; i < COLORS.length; i++) if (COLORS[i].id === id) return COLORS[i].hex;
+    return '#ffffff';
+  }
+
+  /* ---------- fingeravtrycket ---------- */
+  // Nästlade valv med ben, beskurna av en oval. Mellanrummen i GAPS ger brutna åsar.
+  var GAPS = ['', '55 4 100', '22 3.5 48 3.5 100', '70 3 100', '34 3 30 3 100', '12 3 60 3.5 100',
+              '46 3 100', '27 3 44 3 100', '63 3.5 100'];
+  function buildPrint(){
+    var cx = 100, cy = 112, out = '<defs><clipPath id="CLIP"><ellipse cx="100" cy="120" rx="90" ry="114"/></clipPath></defs><g clip-path="url(#CLIP)">';
+    for (var i = 0; i < 9; i++){
+      var r = 6 + i * 9.75, ry = r * 1.12, foot = r * 1.07;
+      out += '<path pathLength="100"' + (GAPS[i] ? ' stroke-dasharray="' + GAPS[i] + '"' : '') +
+        ' d="M' + (cx - foot) + ' 250L' + (cx - r) + ' ' + cy +
+        'A' + r + ' ' + ry + ' 0 0 1 ' + (cx + r) + ' ' + cy + 'L' + (cx + foot) + ' 250"/>';
+    }
+    return out + '</g>';
+  }
+  var art = buildPrint();
+  $('fpBase').innerHTML = art.replace(/CLIP/g, 'clipBase');
+  elHot.innerHTML = art.replace(/CLIP/g, 'clipHot');
+
+  /* ---------- skanning ---------- */
+  var SWEEP_MS = 1300;   // en hel tur upp och ner
+  var BAND = 9;          // procent av höjden som lyser kring lasern
+  var state = 'idle', pick = null, t0 = 0, raf = 0;
+
+  function setState(s){ state = s; phone.setAttribute('data-state', s); }
+
+  function idle(){
+    if (raf){ cancelAnimationFrame(raf); raf = 0; }
+    setState('idle');
+    elReadout.textContent = 'Placera fingret på avläsaren';
+  }
+
+  function frame(now){
+    var t = now - t0, dur = cfg.seconds * 1000;
+    if (t >= dur){ finish(); return; }
+    var y = (1 - Math.cos(2 * Math.PI * t / SWEEP_MS)) / 2 * 100;
+    var clip = 'inset(' + Math.max(0, y - BAND) + '% 0 ' + Math.max(0, 100 - y - BAND) + '% 0)';
+    elLaser.style.top = y + '%';
+    elHot.style.webkitClipPath = clip;
+    elHot.style.clipPath = clip;
+    elReadout.textContent = 'Analyserar … ' + Math.floor(t / dur * 100) + ' %';
+    raf = requestAnimationFrame(frame);
+  }
+
+  function startScan(zone){
+    if (state === 'scanning' || sheet.classList.contains('open')) return;
+    pick = cfg[zone];
+    setState('scanning');
+    haptic();
+    t0 = performance.now();
+    frame(t0);
+  }
+
+  function finish(){
+    raf = 0;
+    phone.style.setProperty('--res', hexOf(pick.color));
+    elReadout.textContent = pick.text;
+    setState('result');
+    haptic();
+  }
+
+  // Knappen är tre zoner: var på bredden trycket hamnar avgör svaret
+  function zoneAt(x){
+    var r = btn.getBoundingClientRect();
+    var f = (x - r.left) / r.width;
+    return f < 1/3 ? 'left' : f < 2/3 ? 'mid' : 'right';
+  }
+  // pointerdown i stället för click: fungerar även när ett annat finger vilar på fingeravtrycket
+  btn.addEventListener('pointerdown', function(e){ startScan(zoneAt(e.clientX)); });
+  btn.addEventListener('click', function(){ startScan('mid'); btn.blur(); });   // tangentbord
+  document.addEventListener('touchstart', function(){}, { passive:true });
+  document.addEventListener('contextmenu', function(e){ if (!e.target.closest('.sheet')) e.preventDefault(); });
+
+  // Tangentbord (för dator): 1, 2 och 3 motsvarar vänster, mitten och höger
+  document.addEventListener('keydown', function(e){
+    if (sheet.classList.contains('open')) return;
+    var i = ['1','2','3'].indexOf(e.key);
+    if (i !== -1) startScan(ZONES[i]);
+  });
+
+  function haptic(){
+    try { if (navigator.vibrate) navigator.vibrate(18); } catch(e){}
+    try { $('hapticLabel').click(); } catch(e){}   // iOS: switch-kontroll ger en liten vibration
+  }
+
+  /* ---------- dolda inställningar ---------- */
+  var sheet = $('sheet');
+  ZONES.forEach(function(z){
+    var sel = $('s-' + z + '-color');
+    COLORS.forEach(function(c){
+      var o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  });
+  function openSheet(){
+    if (state === 'scanning') return;
+    ZONES.forEach(function(z){
+      $('s-' + z + '-text').value = cfg[z].text;
+      $('s-' + z + '-color').value = cfg[z].color;
+    });
+    $('s-seconds').value = cfg.seconds;
+    $('s-version').textContent = APP_VERSION;
+    sheet.classList.add('open');
+  }
+  function readSheet(){
+    ZONES.forEach(function(z){
+      cfg[z].text = $('s-' + z + '-text').value.trim();
+      cfg[z].color = $('s-' + z + '-color').value;
+    });
+    var s = parseInt($('s-seconds').value, 10);
+    cfg.seconds = isFinite(s) && s >= 1 ? Math.min(s, 15) : 3;
+    saveCfg();
+  }
+  $('done').addEventListener('click', function(){
+    readSheet();
+    sheet.classList.remove('open');
+    idle();
+  });
+  sheet.addEventListener('change', readSheet);
+
+  function longPress(el, action){
+    var timer = null;
+    var cancel = function(){ if (timer){ clearTimeout(timer); timer = null; } };
+    el.addEventListener('pointerdown', function(){
+      cancel();
+      timer = setTimeout(function(){ timer = null; action(); }, 650);
+    });
+    ['pointerup','pointerleave','pointercancel'].forEach(function(ev){ el.addEventListener(ev, cancel); });
+  }
+  longPress($('title'), openSheet);   // rubriken högst upp: långtryck öppnar dolda menyn
+
+  idle();
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
