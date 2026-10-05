@@ -4,7 +4,9 @@ Låtsasskanner för fingeravtryck, byggd som installerbar PWA på samma sätt so
 Ett stort fingeravtryck mitt på skärmen och en bred knapp, Skanna. Knappen är i hemlighet tre
 knappar: var på bredden man trycker avgör vilket svar som visas när skanningen är klar.
 
-Ännu inget git-repo och inte publicerad. Tänkt att läggas på GitHub Pages som `Kalkylator`.
+- Repo: `hansjnsson/detektor` (publikt), branch `main`.
+- Publicerad på https://hansjnsson.github.io/detektor/ via GitHub Pages, direkt från
+  `main` i repo-roten. **En push till `main` är en deploy.**
 
 ## Stack
 
