@@ -108,6 +108,10 @@ body{
 .row input::placeholder{color:#636366}
 .note{color:var(--muted);font-size:13px;line-height:1.35;margin:7px 32px 0}
 .status{color:var(--muted)}
+.link{background:none;border:0;color:var(--accent);font:inherit;padding:0;cursor:pointer;text-align:left}
+.set{cursor:pointer}
+.set span:first-child{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.set .ck{color:var(--accent);font-weight:600}
 @media (prefers-reduced-motion:reduce){.scan::after,.scan,.fp.base{transition:none}.phone[data-state="result"] .readout{animation:none}}
 </style>
 </head>
@@ -138,6 +142,17 @@ body{
       <h1>Dolt läge</h1>
       <button class="done" id="done">Klar</button>
     </header>
+
+    <p class="caption">Uppsättningar</p>
+    <div class="group" id="s-sets"></div>
+    <p class="note">Tryck på en uppsättning för att välja den. Den valda används när du skannar, och det är den du ändrar här nedanför.</p>
+
+    <div class="group">
+      <div class="row">
+        <label for="s-name">Namn</label>
+        <input type="text" id="s-name" autocomplete="off" maxlength="40">
+      </div>
+    </div>
 
     <p class="caption">Vänster del av knappen</p>
     <div class="group">
@@ -176,6 +191,12 @@ body{
     </div>
     <p class="note">Knappen ser ut som en enda knapp men är delad i tre lika breda delar. Var du trycker avgör vilket svar som visas när skanningen är klar.</p>
 
+    <div class="group" id="s-remove-group">
+      <div class="row">
+        <button class="link" id="s-remove">Ta bort uppsättningen</button>
+      </div>
+    </div>
+
     <div class="group">
       <div class="row">
         <label for="s-seconds">Skanningstid (sekunder)</label>
@@ -199,34 +220,54 @@ body{
   var phone = $('phone'), elReadout = $('readout'), elLaser = $('laser'), elHot = $('fpHot'), btn = $('scan');
 
   /* ---------- inställningar ---------- */
-  var APP_VERSION = '1 · 2026-10-05';
+  var APP_VERSION = '2 · 2026-10-05';
   var ZONES = ['left','mid','right'];
   var COLORS = [
     { id:'green',  name:'Grön',  hex:'#30d158' },
     { id:'yellow', name:'Gul',   hex:'#ffd60a' },
     { id:'red',    name:'Röd',   hex:'#ff453a' },
     { id:'blue',   name:'Blå',   hex:'#0a84ff' },
+    { id:'pink',   name:'Rosa',  hex:'#ff6eb4' },
     { id:'white',  name:'Vit',   hex:'#ffffff' }
   ];
+  // Varje uppsättning har ett namn och ett svar per zon. cfg.active pekar ut den som används.
   var cfg = {
-    left:  { text:'SANNING', color:'green' },
-    mid:   { text:'OSÄKERT', color:'yellow' },
-    right: { text:'LÖGN',    color:'red' },
+    sets:[
+      { name:'Sant eller lögn',
+        left:{ text:'SANNING', color:'green' }, mid:{ text:'OSÄKERT', color:'yellow' }, right:{ text:'LÖGN', color:'red' } },
+      { name:'Man eller kvinna',
+        left:{ text:'MAN', color:'blue' }, mid:{ text:'OSÄKERT', color:'yellow' }, right:{ text:'KVINNA', color:'pink' } }
+    ],
+    active:0,
     seconds:3
   };
+  function cleanSet(s){
+    if (!s || typeof s !== 'object') return null;
+    var out = { name: typeof s.name === 'string' ? s.name : '' };
+    ZONES.forEach(function(z){
+      var v = s[z] && typeof s[z] === 'object' ? s[z] : {};
+      out[z] = { text: typeof v.text === 'string' ? v.text : '', color: typeof v.color === 'string' ? v.color : 'white' };
+    });
+    return out;
+  }
   try {
     var saved = JSON.parse(localStorage.getItem('detektor_cfg') || 'null');
     if (saved && typeof saved === 'object'){
-      ZONES.forEach(function(z){
-        if (saved[z] && typeof saved[z] === 'object'){
-          if (typeof saved[z].text === 'string') cfg[z].text = saved[z].text;
-          if (typeof saved[z].color === 'string') cfg[z].color = saved[z].color;
-        }
-      });
+      if (Array.isArray(saved.sets)){
+        var sets = saved.sets.map(cleanSet).filter(Boolean);
+        if (sets.length) cfg.sets = sets;
+      } else if (saved.left){
+        // Version 1 sparade en enda uppsättning direkt i cfg
+        var own = cleanSet(saved);
+        own.name = cfg.sets[0].name;
+        cfg.sets[0] = own;
+      }
+      if (isFinite(saved.active)) cfg.active = Math.min(Math.max(0, Math.floor(saved.active)), cfg.sets.length - 1);
       if (isFinite(saved.seconds)) cfg.seconds = saved.seconds;
     }
   } catch(e){}
   function saveCfg(){ try { localStorage.setItem('detektor_cfg', JSON.stringify(cfg)); } catch(e){} }
+  function cur(){ return cfg.sets[cfg.active]; }
   function hexOf(id){
     for (var i = 0; i < COLORS.length; i++) if (COLORS[i].id === id) return COLORS[i].hex;
     return '#ffffff';
@@ -277,7 +318,7 @@ body{
 
   function startScan(zone){
     if (state === 'scanning' || sheet.classList.contains('open')) return;
-    pick = cfg[zone];
+    pick = cur()[zone];
     setState('scanning');
     haptic();
     t0 = performance.now();
@@ -326,20 +367,45 @@ body{
       sel.appendChild(o);
     });
   });
-  function openSheet(){
-    if (state === 'scanning') return;
+  function setName(s, i){ return s.name || 'Uppsättning ' + (i + 1); }
+  function renderSets(){
+    var box = $('s-sets');
+    box.textContent = '';
+    cfg.sets.forEach(function(s, i){
+      var r = document.createElement('div'); r.className = 'row set'; r.setAttribute('data-i', i);
+      var n = document.createElement('span'); n.textContent = setName(s, i);
+      var c = document.createElement('span'); c.className = 'ck'; c.textContent = i === cfg.active ? '✓' : '';
+      r.appendChild(n); r.appendChild(c);
+      box.appendChild(r);
+    });
+    var add = document.createElement('div'); add.className = 'row';
+    var b = document.createElement('button'); b.className = 'link'; b.id = 's-add'; b.textContent = 'Ny uppsättning';
+    add.appendChild(b);
+    box.appendChild(add);
+    $('s-remove-group').style.display = cfg.sets.length > 1 ? '' : 'none';
+  }
+  function fillSheet(){
+    var s = cur();
+    $('s-name').value = s.name;
     ZONES.forEach(function(z){
-      $('s-' + z + '-text').value = cfg[z].text;
-      $('s-' + z + '-color').value = cfg[z].color;
+      $('s-' + z + '-text').value = s[z].text;
+      $('s-' + z + '-color').value = s[z].color;
     });
     $('s-seconds').value = cfg.seconds;
+    renderSets();
+  }
+  function openSheet(){
+    if (state === 'scanning') return;
+    fillSheet();
     $('s-version').textContent = APP_VERSION;
     sheet.classList.add('open');
   }
   function readSheet(){
+    var set = cur();
+    set.name = $('s-name').value.trim();
     ZONES.forEach(function(z){
-      cfg[z].text = $('s-' + z + '-text').value.trim();
-      cfg[z].color = $('s-' + z + '-color').value;
+      set[z].text = $('s-' + z + '-text').value.trim();
+      set[z].color = $('s-' + z + '-color').value;
     });
     var s = parseInt($('s-seconds').value, 10);
     cfg.seconds = isFinite(s) && s >= 1 ? Math.min(s, 15) : 3;
@@ -350,7 +416,27 @@ body{
     sheet.classList.remove('open');
     idle();
   });
-  sheet.addEventListener('change', readSheet);
+  sheet.addEventListener('change', function(){ readSheet(); renderSets(); });
+  $('s-sets').addEventListener('click', function(e){
+    var row = e.target.closest('.set');
+    if (!row && e.target.id !== 's-add') return;
+    readSheet();
+    if (row) cfg.active = parseInt(row.getAttribute('data-i'), 10);
+    else {
+      cfg.sets.push(cleanSet({}));
+      cfg.active = cfg.sets.length - 1;
+    }
+    saveCfg();
+    fillSheet();
+    if (!row) $('s-name').focus();
+  });
+  $('s-remove').addEventListener('click', function(){
+    if (cfg.sets.length < 2) return;
+    cfg.sets.splice(cfg.active, 1);
+    cfg.active = Math.max(0, cfg.active - 1);
+    saveCfg();
+    fillSheet();
+  });
 
   function longPress(el, action){
     var timer = null;

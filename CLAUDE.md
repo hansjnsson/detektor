@@ -59,9 +59,14 @@ Nya filer som ska fungera offline läggs också till i `ASSETS` i `sw.js`.
 
 - Långtryck (650 ms) på rubriken högst upp öppnar inställningsbladet. Det går inte att öppna
   under en pågående skanning.
-- Där väljs svarstext och färg (`COLORS`) för var och en av de tre zonerna samt skanningstid
-  i sekunder (1–15).
-- Inställningarna ligger i `cfg` och sparas i `localStorage` under `detektor_cfg`.
+- Svaren ligger i uppsättningar (`cfg.sets`), till exempel "Sant eller lögn" och "Man eller
+  kvinna". Varje uppsättning har namn samt svarstext och färg (`COLORS`) för var och en av de
+  tre zonerna. `cfg.active` pekar ut den valda, som `cur()` returnerar.
+- I bladet väljer man uppsättning genom att trycka på den i listan. Fälten under listan ändrar
+  den valda. Där finns också Ny uppsättning, Ta bort uppsättningen och skanningstid i sekunder
+  (1–15, gemensam för alla).
+- Inställningarna sparas i `localStorage` under `detektor_cfg`. Version 1 sparade en enda
+  uppsättning direkt i `cfg`; den läses in som första uppsättningen.
 
 Inget i det synliga gränssnittet får avslöja att knappen har tre zoner: samma tryckeffekt
 oavsett var man trycker.

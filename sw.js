@@ -1,4 +1,4 @@
-const CACHE = 'detektor-v1';
+const CACHE = 'detektor-v2';
 const ASSETS = [
   './','./index.html','./manifest.webmanifest',
   './apple-touch-icon.png','./icon-192.png','./icon-512.png','./icon-512-maskable.png'
